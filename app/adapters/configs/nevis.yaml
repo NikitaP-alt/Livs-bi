@@ -1,0 +1,13 @@
+client: "Невис"
+source: sellout
+file_type: excel
+sheet: "TDSheet"
+header_row: 5
+columns:
+  sku_code: "Номенклатура"
+  sku_name: "Номенклатура"
+  qty: "Количество"
+  tt_code: "Номер аптеки"
+  tt_name: "Адрес"
+period:
+  mode: from_arg

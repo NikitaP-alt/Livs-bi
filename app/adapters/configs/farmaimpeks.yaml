@@ -1,0 +1,16 @@
+client: "Фармаимпекс"
+source: sellout
+file_type: excel
+sheet: 0
+header_detect: true
+columns:
+  sku_code: "Наименование"
+  sku_name: "Наименование"
+  qty: ["Продажи, шт", "Продажи шт", "Продажи,шт"]
+  rub: ["СуммаЗак", "Сумма Зак"]
+  tt_code: ["код аптеки", "Код аптеки"]
+  tt_name: "Аптека"
+  tt_city: "Город"
+  tt_chain: "Регион"
+period:
+  mode: from_arg

@@ -1,0 +1,16 @@
+client: "ЛекОптТорг"
+source: sellout
+file_type: excel
+sheet: 0
+header_row: 0
+columns:
+  sku_code: "SKU ID"
+  sku_name: "SKU Наименование"
+  qty: "Количество, уп"
+  rub: "Сумма ЗЦ, руб. без НДС"
+  tt_code: "ID аптеки"
+  tt_name: "Адрес аптеки"
+  tt_inn: "ИНН аптеки"
+  tt_chain: "Бренд аптеки"
+period:
+  mode: from_arg

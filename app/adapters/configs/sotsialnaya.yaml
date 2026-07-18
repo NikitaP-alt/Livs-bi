@@ -1,0 +1,14 @@
+client: "Социальная аптека"
+source: sellout
+file_type: excel
+sheet: 0
+header_detect: true
+columns:
+  sku_code: "Номенклатура Маркетинговое наименование"
+  sku_name: "Номенклатура Маркетинговое наименование"
+  qty: "Продажи штуки"
+  tt_code: "Аптека Краткое наименование"
+  tt_name: "Аптека Сводный адрес"
+  tt_chain: "Аптека Регион"
+period:
+  mode: from_arg

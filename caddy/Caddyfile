@@ -1,0 +1,8 @@
+# Авто-HTTPS: Caddy сам получит сертификат Let's Encrypt для домена из .env (DOMAIN).
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	reverse_proxy metabase:3000
+}

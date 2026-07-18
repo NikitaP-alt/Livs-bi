@@ -1,0 +1,16 @@
+client: "Аптека.ру"
+source: sellout
+file_type: excel
+sheet: "Продажи по клиентам с адресами"
+header_row: 0
+columns:
+  sku_code: "Товар"
+  sku_name: "Товар"
+  qty: "Продажи, шт."
+  tt_name: "Клиент"
+  tt_chain: "Клиент"
+  tt_inn: "ИНН клиента"
+  tt_city: "Город"
+tt_compose: ["ИНН клиента", "Город", "Улица"]
+period:
+  mode: from_arg

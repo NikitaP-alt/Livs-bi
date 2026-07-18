@@ -1,0 +1,22 @@
+# Пример переходника: один клиент + один тип отчёта.
+# Под реального клиента меняются только названия колонок и формат — код общий.
+client: "Аптека Пример"
+source: sellout            # sellout | stock | sellin
+file_type: csv            # csv | excel
+sep: ";"                  # разделитель CSV (Excel в РФ часто пишет ;)
+encoding: "utf-8"
+header_row: 0             # номер строки с заголовками (с нуля)
+decimal: ","              # десятичный разделитель в числах
+thousands: " "           # разделитель тысяч
+
+columns:                  # наш канон  <-  колонка в файле клиента
+  tt_code:  "Код аптеки"
+  sku_code: "Артикул поставщика"
+  sku_name: "Наименование"
+  qty:      "Продано, шт"
+  rub:      "Сумма, руб"
+
+period:
+  mode: from_column       # from_column | from_arg
+  column: "Период"
+  format: "%Y-%m"

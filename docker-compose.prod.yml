@@ -1,0 +1,50 @@
+# Продакшен-оверлей. Запуск:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Добавляет:
+#  - Caddy (reverse-proxy + авто-HTTPS Let's Encrypt по домену из .env)
+#  - автоперезапуск контейнеров после ребута сервера
+#  - Metabase остаётся на H2-файле (./metabase-data) — так переносятся ГОТОВЫЕ дашборды,
+#    view-only юзер, русский интерфейс и публичные ссылки из снапшота (без пересборки).
+#    H2 достаточно для этого масштаба; миграцию на Postgres-app-БД можно сделать позже.
+services:
+  caddy:
+    image: caddy:2
+    container_name: livs_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - metabase
+
+  db:
+    restart: unless-stopped
+
+  app:
+    restart: unless-stopped
+
+  metabase:
+    restart: unless-stopped
+    environment:
+      MB_SITE_URL: https://${DOMAIN}
+      # Хранилище настроек Metabase — H2-файл из ./metabase-data (см. базовый compose),
+      # чтобы перенести готовые дашборды/юзеров/локализацию из снапшота. НЕ переключаем на Postgres.
+      # (Для перехода на Postgres-app-БД позже: раскомментировать ниже + сделать load-from-h2.)
+      # MB_DB_TYPE: postgres
+      # MB_DB_DBNAME: metabaseapp
+      # MB_DB_PORT: 5432
+      # MB_DB_USER: ${POSTGRES_USER}
+      # MB_DB_PASS: ${POSTGRES_PASSWORD}
+      # MB_DB_HOST: db
+
+volumes:
+  caddy_data:
+  caddy_config:

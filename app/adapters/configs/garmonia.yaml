@@ -1,0 +1,13 @@
+client: "Гармония Здоровья"
+source: sellout
+file_type: excel
+sheet: "Лист1"
+header_detect: true
+columns:
+  sku_code: "Наименование товара"
+  sku_name: "Наименование товара"
+  qty: "СумКол"
+  tt_name: "Аптека"
+tt_compose: ["Аптека", "Адрес"]
+period:
+  mode: from_arg

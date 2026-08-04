@@ -64,50 +64,22 @@ def adapt(file_path: str | Path, period_override: Optional[str] = None):
         return (str(rec.get("Код", "")).strip() or str(rec.get("ID_MP", "")).strip())
 
     rows: list[SalesRow] = []
-    is_stock = any(c.startswith("Остаток") for c in cols)
     units_col = next((c for c in cols if c.startswith("Продано") and "Упак" in c), None)
+    sklad = next((c for c in cols if c.startswith("Остаток") and "Склад" in c), None)
+    rozn = next((c for c in cols if c.startswith("Остаток") and "Розниц" in c), None)
 
-    if is_stock:
-        sklad = next((c for c in cols if c.startswith("Остаток") and "Склад" in c), None)
-        rozn = next((c for c in cols if c.startswith("Остаток") and "Розниц" in c), None)
-        price_col = next((c for c in cols if c.startswith("Цены")), None)
+    # колонки-аптеки (старый широкий формат товар×аптека); служебные исключаем
+    attrs = {"Код", "Наименование", "Производитель", "ID_MP", "Вывод", "Менеджер",
+             "Холдинг", "Тотал сток"}
+    skip_pref = ("Группа", "Цены", "Приход", "Остаток", "Продано", "в мес", "остаток в руб")
+    pharm = [c for c in cols if c not in attrs and not c.startswith(skip_pref)]
+
+    if not units_col and not sklad and pharm:
+        # старый широкий формат: строки=товары, колонки=аптеки -> unpivot
         for rec in raw_records:
             name = str(rec.get("Наименование", "")).strip()
             code = code_of(rec)
-            if not name:
-                continue
-            qty = (_num(rec.get(sklad)) if sklad else 0.0) + (_num(rec.get(rozn)) if rozn else 0.0)
-            if qty == 0:
-                continue
-            price = _num(rec.get(price_col)) if price_col else 0.0
-            rows.append(SalesRow(source="stock", client_name=CLIENT,
-                                 sku_code=code or name, sku_name=name,
-                                 qty=qty, rub=(round(qty * price, 2) if price else None),
-                                 snapshot_date=_eom(month)))
-    elif units_col:
-        # узкий формат "по изготовителю": продажи на уровне товара (без точек)
-        rub_col = next((c for c in cols if c.startswith("Продано") and ("Сумма" in c or "ЗЦ" in c)), None)
-        for rec in raw_records:
-            name = str(rec.get("Наименование", "")).strip()
-            code = code_of(rec)
-            if not name:
-                continue
-            qty = _num(rec.get(units_col))
-            if qty <= 0:
-                continue
-            rub = _num(rec.get(rub_col)) if rub_col else 0.0
-            rows.append(SalesRow(source="sellout", client_name=CLIENT,
-                                 sku_code=code or name, sku_name=name,
-                                 qty=qty, rub=(rub or None), period=month))
-    else:
-        # широкая матрица товар x аптека -> unpivot (только реальные колонки-аптеки)
-        attrs = {"Код", "Наименование", "Производитель", "ID_MP", "Вывод", "Менеджер"}
-        skip_pref = ("Группа", "Цены", "Приход", "Остаток", "Продано")
-        pharm = [c for c in cols if c not in attrs and not c.startswith(skip_pref)]
-        for rec in raw_records:
-            name = str(rec.get("Наименование", "")).strip()
-            code = code_of(rec)
-            if not name:
+            if not name or name.startswith("Общий итог"):
                 continue
             for p in pharm:
                 v = _num(rec.get(p))
@@ -117,5 +89,31 @@ def adapt(file_path: str | Path, period_override: Optional[str] = None):
                 rows.append(SalesRow(source="sellout", client_name=CLIENT,
                                      sku_code=code or name, sku_name=name, qty=v,
                                      tt_code=p, tt_name=p, tt_city=city, period=month))
+        return rows, raw_records
+
+    # новый узкий "по изготовителю": в ОДНОМ файле И продажи, И остатки (на уровне товара, без точек)
+    rub_col = next((c for c in cols if c.startswith("Продано") and ("Сумма" in c or "ЗЦ" in c)), None)
+    price_col = next((c for c in cols if c.startswith("Цены")), None)
+    for rec in raw_records:
+        name = str(rec.get("Наименование", "")).strip()
+        code = code_of(rec)
+        if not name or name.startswith("Общий итог"):
+            continue
+        # продажи (sell-out)
+        if units_col:
+            qs = _num(rec.get(units_col))
+            if qs > 0:
+                rub = _num(rec.get(rub_col)) if rub_col else 0.0
+                rows.append(SalesRow(source="sellout", client_name=CLIENT,
+                                     sku_code=code or name, sku_name=name,
+                                     qty=qs, rub=(rub or None), period=month))
+        # остатки (Склад + Розница)
+        qst = (_num(rec.get(sklad)) if sklad else 0.0) + (_num(rec.get(rozn)) if rozn else 0.0)
+        if qst > 0:
+            price = _num(rec.get(price_col)) if price_col else 0.0
+            rows.append(SalesRow(source="stock", client_name=CLIENT,
+                                 sku_code=code or name, sku_name=name,
+                                 qty=qst, rub=(round(qst * price, 2) if price else None),
+                                 snapshot_date=_eom(month)))
 
     return rows, raw_records

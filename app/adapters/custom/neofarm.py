@@ -79,7 +79,15 @@ def adapt(file_path: str | Path, period_override: Optional[str] = None):
     i_contr = idx("Партия.Контрагент")
     i_srok = idx("Партия.Серия.Срок годности", "Срок годности")
 
-    if i_code is not None:
+    # тип факта: сначала по имени файла (надёжно к смене формата), иначе по колонкам
+    nl = str(file_path).lower()
+    if "закуп" in nl:
+        source = "pos_purchase"
+    elif "остат" in nl:
+        source = "stock"
+    elif "продаж" in nl or "реализ" in nl:
+        source = "sellout"
+    elif i_code is not None:
         source = "pos_purchase"
     elif i_srok is not None:
         source = "stock"

@@ -7,7 +7,7 @@ REGISTRY = {
     # --- группа A / готовые ---
     "Диалог":          {"kind": "py",   "ref": "dialog",
                         "skip_files": r"2022-08-09|2022-08-10|22\.08-19\.09"},
-    "еАптека":         {"kind": "yaml", "ref": "app/adapters/configs/eapteka.yaml"},
+    "еАптека":         {"kind": "py",   "ref": "eapteka"},   # новый формат 2026 (продажи+остатки+закуп по складам)
     "ПланетаЗдоровья": {"kind": "py",   "ref": "planeta"},
     "Аптека.ру":       {"kind": "yaml", "ref": "app/adapters/configs/apteka_ru.yaml"},
     "ЛекОптТорг (СПБ)": {"kind": "py", "ref": "lekopttorg", "skip_files": r"[Аа]кци"},

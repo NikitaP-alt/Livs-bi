@@ -48,10 +48,70 @@ def _row_with(df, kw, lim=10):
     return None
 
 
+FP_MONTHS = {"январь": 1, "февраль": 2, "март": 3, "апрель": 4, "май": 5, "июнь": 6,
+             "июль": 7, "август": 8, "сентябрь": 9, "октябрь": 10, "ноябрь": 11, "декабрь": 12}
+
+
+def _sheet_period(sheet: str) -> Optional[date]:
+    """Период из имени листа: 'май_26' -> 2026-05. Листы без года (2025) -> None (пропуск)."""
+    s = sheet.lower().replace("_", "").replace(" ", "")
+    for w, mo in FP_MONTHS.items():
+        if s.startswith(w):
+            yy = re.search(r"(\d{2})", s[len(w):])
+            return date(2000 + int(yy.group(1)), mo, 1) if yy else None
+    return None
+
+
+def _adapt_pomesyachno(fp):
+    """Накопительный файл «отчеты помесячно»: каждый лист = месяц (продажи по товару).
+    Разметка листов разная — ищем товарную колонку и кол-во/сумму по ключам. Берём только 2026."""
+    xl = pd.ExcelFile(fp)
+    rows: list[SalesRow] = []
+    for sheet in xl.sheet_names:
+        per = _sheet_period(sheet)
+        if per is None or per.year < 2026:
+            continue
+        df = pd.read_excel(fp, sheet_name=sheet, header=None, dtype=str).fillna("")
+        hr = pcol = None
+        for i in range(min(6, len(df))):
+            for j in range(df.shape[1]):
+                cl = str(df.iloc[i, j]).strip().lower()
+                if cl and ("птовар" in cl or cl == "товар" or "наимен" in cl) and "код" not in cl:
+                    hr, pcol = i, j
+                    break
+            if hr is not None:
+                break
+        if hr is None:
+            continue
+        lbl = {j: (str(df.iloc[hr, j]) + " " + (str(df.iloc[hr + 1, j]) if hr + 1 < len(df) else "")).lower()
+               for j in range(df.shape[1])}
+        qcol = next((j for j, l in lbl.items()
+                     if j != pcol and ("продано" in l or "кол-во" in l or "количество" in l)), None)
+        rcol = next((j for j, l in lbl.items()
+                     if j not in (pcol, qcol) and ("сумма" in l or "руб" in l)), None)
+        if rcol is None:                                   # формат B: второй столбец «Продано» = руб
+            rcol = next((j for j, l in lbl.items() if j not in (pcol, qcol) and "продано" in l), None)
+        if qcol is None:
+            continue
+        for r in range(hr + 1, len(df)):
+            name = str(df.iloc[r, pcol]).strip()
+            if not name or name.lower().startswith(("ливс", "итог", "общий")):
+                continue
+            qty = _num(df.iloc[r, qcol])
+            if qty is None or qty <= 0:
+                continue
+            rub = _num(df.iloc[r, rcol]) if rcol is not None else None
+            rows.append(SalesRow(source="sellout", client_name=CLIENT, sku_code=name,
+                                 sku_name=name, qty=qty, rub=rub, period=per))
+    return rows, []
+
+
 def adapt(file_path, period_override: Optional[str] = None):
     fp = _fix_xlsx(str(file_path))
     name = Path(file_path).name
     nlow = name.lower()
+    if "помесячно" in nlow:                         # накопительный файл с листами-месяцами
+        return _adapt_pomesyachno(fp)
     month = _month(period_override, name)
     src_wide = "stock" if "остат" in nlow else ("sellout" if ("продаж" in nlow or "реализ" in nlow) else None)
     xl = pd.ExcelFile(fp)

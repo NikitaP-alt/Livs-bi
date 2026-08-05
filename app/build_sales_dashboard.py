@@ -14,6 +14,15 @@ FC = "{{client}} AND {{product}}"                 # без года (разре�
 MONTHS = [("Янв", 1), ("Фев", 2), ("Мар", 3), ("Апр", 4), ("Май", 5), ("Июн", 6),
           ("Июл", 7), ("Авг", 8), ("Сен", 9), ("Окт", 10), ("Ноя", 11), ("Дек", 12)]
 PIV = ", ".join(f'ROUND(SUM(qty) FILTER (WHERE month_num={n})) AS "{nm}"' for nm, n in MONTHS)
+# помесячно + подытог по кварталу после каждых трёх месяцев: Янв Фев Мар «1 кв» Апр Май Июн «2 кв» …
+_QM = {1: [("Янв", 1), ("Фев", 2), ("Мар", 3)], 2: [("Апр", 4), ("Май", 5), ("Июн", 6)],
+       3: [("Июл", 7), ("Авг", 8), ("Сен", 9)], 4: [("Окт", 10), ("Ноя", 11), ("Дек", 12)]}
+_COLS = []
+for _q in (1, 2, 3, 4):
+    for _nm, _mn in _QM[_q]:
+        _COLS.append(f'ROUND(SUM(qty) FILTER (WHERE month_num={_mn})) AS "{_nm}"')
+    _COLS.append(f'ROUND(SUM(qty) FILTER (WHERE quarter={_q})) AS "{_q} кв"')
+MQPIV = ", ".join(_COLS)
 YOY = 'ROUND(100*({m}-LAG({m}) OVER (ORDER BY year))/NULLIF(LAG({m}) OVER (ORDER BY year),0),0)'
 
 CARDS = [
@@ -30,8 +39,8 @@ CARDS = [
      f'{YOY.format(m="SUM(qty)")} AS "Прирост, %" FROM {V} WHERE {FC} GROUP BY year ORDER BY year',
      {"graph.dimensions": ["Год"], "graph.metrics": ["Шт", "Прирост, %"], "graph.y_axis.auto_split": True},
      (9, 3, 9, 7)),
-    ("Продажи по годам и месяцам, шт", "table",
-     f'SELECT year AS "Год", {PIV}, ROUND(SUM(qty)) AS "Итого", '
+    ("Продажи по месяцам и кварталам, шт", "table",
+     f'SELECT year AS "Год", {MQPIV}, ROUND(SUM(qty)) AS "Итого за год", '
      f'{YOY.format(m="SUM(qty)")} AS "Прирост, %" FROM {V} WHERE {FC} GROUP BY year ORDER BY year',
      {}, (0, 10, 18, 7)),
     ("Продажи всего, шт", "scalar", f'SELECT ROUND(SUM(qty)) FROM {V} WHERE {FC}', {}, (0, 17, 5, 5)),

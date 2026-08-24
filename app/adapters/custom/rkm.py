@@ -1,9 +1,11 @@
-"""Переходник: РКМ. Длинная таблица продаж (строка = продажа):
-Код товара | Название товара | Количество | Адрес аптеки [| Аптека | Фирма-производитель].
-Лист «Озон» (ФИО|Кол-во|Сертификаты) — промо/сотрудники, пропускаем.
-Период в файле отсутствует -> берём из --period (YYYY-MM).
+"""Переходник: РКМ. Два формата:
+1) СТАРЫЙ (2026 Q2): длинная таблица продаж — Код товара | Название | Количество | Адрес аптеки.
+2) НОВЫЙ (июль'26): Аптека | Код товара | Товар | Производитель | Продажи Кол-во | Остатки Кол-во
+   -> sellout (Продажи Кол-во) + stock (Остатки Кол-во).
+Лист «Озон» (промо) пропускаем. Период — из --period.
 """
 from __future__ import annotations
+import calendar
 from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
@@ -32,6 +34,10 @@ def _month(override: Optional[str]) -> Optional[date]:
     return date(d.year, d.month, 1)
 
 
+def _eom(m: date) -> date:
+    return date(m.year, m.month, calendar.monthrange(m.year, m.month)[1])
+
+
 def _find(hdr, *keys) -> Optional[int]:
     for j, h in enumerate(hdr):
         if any(k in str(h).strip().lower() for k in keys):
@@ -57,8 +63,34 @@ def adapt(file_path: str | Path, period_override: Optional[str] = None):
             continue
         hdr = [str(x).strip() for x in df.iloc[0].tolist()]
         jcode = _find(hdr, "код товара", "код")
-        jqty = _find(hdr, "количество", "кол-во", "кол - во")
-        if jcode is None or jqty is None:               # лист «Озон»/пустой — пропускаем
+        if jcode is None:                                   # лист «Озон»/пустой
+            continue
+        j_prod, j_ost = _find(hdr, "продажи"), _find(hdr, "остатки")
+
+        if j_prod is not None and j_ost is not None:        # НОВЫЙ формат (продажи + остатки)
+            jtovar = _find_exact(hdr, "товар")
+            japt = _find_exact(hdr, "аптека")
+            if japt is None:
+                japt = _find(hdr, "адрес")
+            for i in range(1, df.shape[0]):
+                code = str(df.iloc[i, jcode]).strip()
+                if not code or code.lower().startswith(("итог", "общий")):
+                    continue
+                name = str(df.iloc[i, jtovar]).strip() if jtovar is not None else ""
+                tt = str(df.iloc[i, japt]).strip() if japt is not None else ""
+                common = dict(client_name=CLIENT, sku_code=code, sku_name=(name or code),
+                              tt_code=(tt or None), tt_name=(tt or None))
+                sold = _num(df.iloc[i, j_prod])
+                if sold > 0:
+                    rows.append(SalesRow(source="sellout", qty=sold, period=month, **common))
+                stock = _num(df.iloc[i, j_ost])
+                if stock > 0:
+                    rows.append(SalesRow(source="stock", qty=stock,
+                                         snapshot_date=_eom(month) if month else None, **common))
+            continue
+
+        jqty = _find(hdr, "количество", "кол-во", "кол - во")   # СТАРЫЙ формат
+        if jqty is None:
             continue
         jname = _find(hdr, "название", "наименование")
         jaddr = _find(hdr, "адрес")
